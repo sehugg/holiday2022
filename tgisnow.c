@@ -1,9 +1,4 @@
 
-/*
-NOTE: The alternate Apple ][ ROM used by 8bitworkshop
-      is not compatible with the hi-res TGI driver.
-      So we use the lo-res driver here.
-*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <cc65.h>
@@ -14,15 +9,20 @@ NOTE: The alternate Apple ][ ROM used by 8bitworkshop
 #include <string.h>
 #include <peekpoke.h>
 
+// This .cfg file tells CC65:
+// * output a 16 KB cartridge
+// * reserve $1E00 bytes for TGI frame buffer
+
 //#resource "atari-tgi.cfg"
 #define CFGFILE atari-tgi.cfg
 
+// helpful type definitions
 typedef unsigned char byte;
 typedef signed char sbyte;
 typedef unsigned short word;
 typedef enum { false, true } bool;
 
-// include mode $F bitmap (40 * 192 bytes)
+// include Mode F bitmap data (40 * 192 bytes)
 #include "bitmap.c"
 
 // palette colors
@@ -41,17 +41,6 @@ const byte PALETTE[9] = {
 // maximum # of snowflakes
 #define MAX_FLAKES 100
 
-
-///// RANDOM NUMBERS
-
-unsigned long rnd = 1;
-word rand16(void) {
-  unsigned long x = rnd;
-  x ^= x << 13;
-  x ^= x >> 17;
-  x ^= x << 5;
-  return rnd = x;
-}
 
 ///// MUSIC
 
@@ -138,9 +127,9 @@ bool animate(bool created) {
       bg = readflake(newpos);
       if (bg) {
         // cold mode, slide pixel left or right to empty space
-        if (!readflake(newpos+1) && rand16() > STICK_PROB) {
+        if (!readflake(newpos+1) && rand() > STICK_PROB) {
           newpos++;
-        } else if (!readflake(newpos-1) && rand16() > STICK_PROB) {
+        } else if (!readflake(newpos-1) && rand() > STICK_PROB) {
           newpos--;
         } else {
           newpos = 0;	// get rid of snowflake
@@ -160,7 +149,7 @@ bool animate(bool created) {
     // no valid snowflake in this slot, create one?
     else if (!created) {
       // create a new random snowfake at top (only once per loop)
-      oldpos = 1 + rand16() % (MAX_X-1);
+      oldpos = 1 + rand() % (MAX_X-1);
       // make sure snowdrift didn't pile to top of screen
       if (readflake(oldpos) && readflake(oldpos+(MAX_X+1))) {
         // screen is full, exit
@@ -210,7 +199,7 @@ bool DoSnow(void) {
 int main (void)
 {
     /* Install the driver */
-    tgi_install (atr10_tgi);
+    tgi_install (atr10_tgi); // 80 x 192, 9 colors
     CheckError ("tgi_install");
 
     tgi_init ();
