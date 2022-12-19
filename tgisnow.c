@@ -14,10 +14,6 @@ NOTE: The alternate Apple ][ ROM used by 8bitworkshop
 #include <string.h>
 #include <peekpoke.h>
 
-#ifndef DYN_DRV
-#  define DYN_DRV       0
-#endif
-
 //#resource "atari-tgi.cfg"
 #define CFGFILE atari-tgi.cfg
 
@@ -37,6 +33,25 @@ const byte PALETTE[9] = {
 
 // probability (out of 65536) that snow will stick
 #define STICK_PROB 1000
+
+// screen dimensions
+#define MAX_X 79
+#define MAX_Y 191
+
+// maximum # of snowflakes
+#define MAX_FLAKES 100
+
+
+///// RANDOM NUMBERS
+
+unsigned long rnd = 1;
+word rand16(void) {
+  unsigned long x = rnd;
+  x ^= x << 13;
+  x ^= x >> 17;
+  x ^= x << 5;
+  return rnd = x;
+}
 
 ///// MUSIC
 
@@ -61,7 +76,6 @@ static unsigned MaxX;
 static unsigned MaxY;
 static unsigned AspectRatio;
 
-
 static void CheckError (const char* S)
 {
     unsigned char Error = tgi_geterror ();
@@ -74,43 +88,10 @@ static void CheckError (const char* S)
     }
 }
 
-#if DYN_DRV
-static void DoWarning (void)
-/* Warn the user that the dynamic TGI driver is needed for this program */
-{
-    printf ("Warning: This program needs the TGI\n"
-            "driver on disk! Press 'y' if you have\n"
-            "it - any other key exits.\n");
-    if (tolower (cgetc ()) != 'y') {
-        exit (EXIT_SUCCESS);
-    }
-    printf ("OK. Please wait patiently...\n");
-}
-#endif
 
-///////////
+///// SNOWFLAKES
 
-#define MAX_X 79
-#define MAX_Y 191
-
-/*{pal:"astrocade",layout:"astrocade"}*/
-const byte palette[8] = {
-  0x6C, 0xD3, 0x07, 0x01,
-  0x66, 0xD3, 0x07, 0x01,
-};
-
-// fast random numbers
-unsigned long rnd = 1;
-word rand16(void) {
-  unsigned long x = rnd;
-  x ^= x << 13;
-  x ^= x >> 17;
-  x ^= x << 5;
-  return rnd = x;
-}
-
-#define MAX_FLAKES 100
-
+// snowflake array
 word flakes[MAX_FLAKES];
 
 // hard-coded frame buffer (TODO: get from TGI)
@@ -132,8 +113,9 @@ void drawflake(word pos) {
     fb[pos>>1] ^= 0x80;
 }
 
-// return the pixel color at a screen position (not shifted)
-byte readflake(word pos) {
+// read the pixel color at a screen position
+// return true if it is snow-colored
+bool readflake(word pos) {
   if (pos & 1)
     return (fb[pos>>1] & 0x0f) == 0x08;
   else
@@ -194,21 +176,26 @@ bool animate(bool created) {
   return true; // true if screen isn't full
 }
 
+// main snowflake routine
 bool DoSnow(void) {
 
+  // draw bitmap
   tgi_clear();
   tgi_setpalette(PALETTE);
   memcpy(fb, BITMAP, 40*192);
-  memset(fb+40*191, 0x88, 40);
-  //tgi_setcolor(8);
-  //tgi_line(0, MAX_Y, MAX_X, MAX_Y);
+  // draw line on bottom
+  memset(fb+40*191, 0x88, 40); // color of snow
   
+  // animate snowflakes until screen is full
   {
     byte i;
     // initialize snowflake array  
     memset(flakes, 0, sizeof(flakes));
     // animate snowflakes until they pile up too high
     while (animate(false)) {
+      // press ESC to exit
+      if (kbhit() && cgetc() == 0x1b) return false;
+      // update music
       music_update();
       music_update();
     }
@@ -220,23 +207,11 @@ bool DoSnow(void) {
 
 ////////////
 
-
 int main (void)
 {
-    unsigned char Border;
-
-#if DYN_DRV
-    /* Warn the user that the tgi driver is needed */
-    DoWarning ();
-
-    /* Load and initialize the driver */
-    tgi_load_driver (tgi_stddrv);
-    CheckError ("tgi_load_driver");
-#else
     /* Install the driver */
     tgi_install (atr10_tgi);
     CheckError ("tgi_install");
-#endif
 
     tgi_init ();
     CheckError ("tgi_init");
@@ -250,16 +225,8 @@ int main (void)
     while (DoSnow()) {
     }
 
-#if DYN_DRV
-    /* Unload the driver */
-    tgi_unload ();
-#else
     /* Uninstall the driver */
     tgi_uninstall ();
-#endif
-
-    /* Reset the border */
-    (void) bordercolor (Border);
 
     /* Done */
     printf ("Done\n");
