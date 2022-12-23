@@ -87,8 +87,8 @@ static void CheckError (const char* S)
 // snowflake array
 word flakes[MAX_FLAKES];
 
-// hard-coded frame buffer (TODO: get from TGI)
-byte* fb = (byte*) 0x6150;
+// frame buffer address
+byte* fb;
 
 // clear the pixel
 void clearflake(word pos) {
@@ -199,28 +199,34 @@ bool DoSnow(void) {
 
 int main (void)
 {
-    /* Install the driver */
-    tgi_install (atr10_tgi); // 80 x 192, 9 colors
-    CheckError ("tgi_install");
+  /* Install the driver */
+  tgi_install (atr10_tgi); // 80 x 192, 9 colors
+  CheckError ("tgi_install");
 
-    tgi_init ();
-    CheckError ("tgi_init");
-    tgi_clear ();
+  tgi_init ();
+  CheckError ("tgi_init");
+  tgi_clear ();
 
-    /* Get stuff from the driver */
-    MaxX = tgi_getmaxx ();
-    MaxY = tgi_getmaxy ();
-    AspectRatio = tgi_getaspectratio ();
-  
-    set_irq(music_update, (void*)0x7000, 0x100);
+  /* Get stuff from the driver */
+  MaxX = tgi_getmaxx ();
+  MaxY = tgi_getmaxy ();
+  AspectRatio = tgi_getaspectratio ();
 
-    while (DoSnow()) {
-    }
+  // set up music driver
+  set_irq(music_update, (void*)0x7000, 0x100);
 
-    /* Uninstall the driver */
-    tgi_uninstall ();
+  // read frame buffer address from SAVMSC ($58)
+  fb = (char*) PEEKW(0x58);
 
-    /* Done */
-    printf ("Done\n");
-    return EXIT_SUCCESS;
+  // repeat snow demo until ESC pressed
+  while (DoSnow()) {
+  }
+
+  /* Uninstall the driver */
+  tgi_uninstall ();
+  reset_irq();
+
+  /* Done */
+  printf ("Done\n");
+  return EXIT_SUCCESS;
 }
