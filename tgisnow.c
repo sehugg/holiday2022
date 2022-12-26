@@ -33,7 +33,8 @@ const byte PALETTE[9] = {
 };
 
 // probability (out of 65536) that snow will stick
-#define STICK_PROB 1000
+#define STICK_PROB 400  // adjusted down due to introducing friction
+#define FRICTION 24000 // keeping FRICTION high will help keeping down the sudden acceleration when flakes slide
 
 // screen dimensions
 #define MAX_X 79
@@ -130,11 +131,15 @@ bool animate(bool created) {
       // read pixel at new pos
       bg = readflake(newpos);
       if (bg) {
+        word r = rand();
         // cold mode, slide pixel left or right to empty space
-        if (!readflake(newpos+1) && rand() > STICK_PROB) {
-          newpos++;
-        } else if (!readflake(newpos-1) && rand() > STICK_PROB) {
-          newpos--;
+        if (r > STICK_PROB && !(readflake(newpos+1) && readflake(newpos-1))) {
+          if (r > FRICTION)
+            continue;
+          if (!readflake(newpos+1))
+              newpos++;
+            else
+              newpos--;
         } else {
           newpos = 0;	// get rid of snowflake
         }
